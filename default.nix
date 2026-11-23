@@ -5,7 +5,7 @@
 let
   inherit (nixpkgs) lib;
   eachSystem = lib.genAttrs systems;
-  ca = drv: drv.overrideAttrs { __contentAddressed = true; };
+  ca = drv: drv.overrideAttrs { __contentAddressed = true; allowSubstitutes = true; };
   clean = src:
     let root = toString src;
     in if src ? _isLibCleanSourceWith then src.outPath
@@ -104,7 +104,7 @@ let
            else if operation == "test" then tool.lib.mkTest args
            else let app = tool.lib.mkApp args;
                     pkgs = tool.inputs.nixpkgs.legacyPackages.''${args.system};
-                in (pkgs.writeShellScript "${name}-run" ("exec " + pkgs.lib.escapeShellArg app.program + " \"$@\"")).overrideAttrs { __contentAddressed = true; }
+                in (pkgs.writeShellScript "${name}-run" ("exec " + pkgs.lib.escapeShellArg app.program + " \"$@\"")).overrideAttrs { __contentAddressed = true; allowSubstitutes = true; }
       '');
     in pkgs.runCommand name {
       __contentAddressed = true;

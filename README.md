@@ -1,7 +1,27 @@
 # drvkit
 
-Shared Rust command line and Nix flake interface for drvlang builders. Language repositories supply a builder and any language-specific checks. Their flakes pin drvkit as a source input.
+drvkit supplies the Rust command line, dynamic Nix planner, and flake outputs used by the [drvlang builders](https://drvlang.org/languages/). A language repository pins this repository as a source input and provides its package and test builders.
 
-A packaged tool runs `build [-C PROJECT] [-o RESULT | --no-link] [--options JSON]` and prints the resulting Nix store path. Options are a JSON object passed to the language builder. Downstream flakes can call `lib.mkPackage { system, src, ... }` or `lib.mkFlake { src, ... }`. Source arguments can be filtered further by the caller.
+## CLI
 
-Each language flake also exposes a Rust benchmark runner. `nix run .#bench -- --runs 5` realizes the pinned inputs and repeats the benchmark derivation using `nix build --rebuild`. Samples include Nix process startup and the workload in the benchmark derivation. Dependencies already in the store stay cached. To time a planner directly, pass `-- COMMAND ARG ...`.
+```sh
+drvpy build -C . -o result
+drvpy test -C . api -- -q
+drvpy run -C . api -- --help
+```
+
+`build`, `test`, and `run` accept an optional target, `-C PROJECT`, and language options as `--options JSON`. Builds link `result` by default. Tests print the realized check path. Programs receive their arguments and return their own exit status.
+
+## Flakes
+
+Single projects use `lib.mkFlake { src = ./.; }`. Monorepos use `lib.mkMonorepoFlake { src = ./.; }` with a root `drvlang.json` like this.
+
+```json
+{ "commands": { "api": "apps/api", "worker": "apps/worker" } }
+```
+
+An explicit `commands` attribute in Nix takes precedence. Use `nix build .#api`, `nix run .#api -- --help`, or `nix flake check`. The lower-level entry points are `lib.mkPackage`, `lib.mkTest`, and `lib.mkApp`. Projects with multiple binaries can select one using the `program` option.
+
+## Benchmarks
+
+`nix run .#bench -- --runs 5` in a consuming builder realizes its pinned upstream check, finds the derivation Nix actually built, and rebuilds that check for each sample. Times include Nix process startup. Dependencies already in the store stay cached. Use `-- COMMAND ARG ...` to time a separate executable with one warm-up before the measured runs.

@@ -37,4 +37,4 @@ An explicit `commands` attribute in Nix takes precedence. Use `nix build .#api`,
 
 ## Benchmarks
 
-`nix run .#bench -- --runs 5` in a consuming builder realizes its pinned upstream check, finds the derivation Nix actually built, and rebuilds that check for each sample. Times include Nix process startup. Dependencies already in the store stay cached. Use `-- COMMAND ARG ...` to time a separate executable with one warm-up before the measured runs.
+`nix run .#bench -- --runs 5` in a consuming builder warms its pinned upstream check, then runs a fresh benchmark derivation for each sample. A unique trial input only changes the benchmark recipe. Times include Nix process startup. Dependencies already in the store stay cached. Use `-- COMMAND ARG ...` to time a separate executable with one warm-up before the measured runs.

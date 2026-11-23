@@ -71,6 +71,14 @@ let
     in { packages = forTargets package; checks = forTargets test; apps = forTargets app; };
   bench = system:
     let pkgs = nixpkgs.legacyPackages.${system};
+        # Each trial runs the benchmark itself, even if its CA output is
+        # already in the store. Its dependency graph stays warm.
+        entry = ca (pkgs.writeText "drvbench.nix" ''
+          { trial }: ((builtins.getFlake "path:${self.outPath}").checks.${system}.benchmark).overrideAttrs {
+            drvlangBenchTrial = trial;
+            allowSubstitutes = false;
+          }
+        '');
     in pkgs.runCommand "drvbench" {
       __contentAddressed = true;
       nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc pkgs.makeWrapper ];
@@ -78,7 +86,7 @@ let
     } ''
       mkdir -p "$out/bin"
       rustc --edition=2021 -C opt-level=s ${./src/bench.rs} -o "$out/bin/drvbench"
-      wrapProgram "$out/bin/drvbench" --set DRVLANG_BENCH "path:${self.outPath}#checks.${system}.benchmark" \
+      wrapProgram "$out/bin/drvbench" --set DRVLANG_BENCH_ENTRY ${entry} \
         --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
     '';
   cli = system:

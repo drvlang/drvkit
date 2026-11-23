@@ -2,7 +2,7 @@
 use std::env;
 use std::ffi::OsString;
 use std::process::{Command, ExitCode, Stdio};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 struct Options {
     runs: usize,
@@ -48,49 +48,35 @@ fn measure(command: &[OsString]) -> Result<u128, String> {
     }
     Ok(start.elapsed().as_micros())
 }
-fn store_path(command: &mut Command) -> Result<String, String> {
-    let result = command
-        .stderr(Stdio::inherit())
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !result.status.success() {
-        return Err(format!(
-            "{} exited with {}",
-            command.get_program().to_string_lossy(),
-            result.status
-        ));
-    }
-    let stdout = String::from_utf8(result.stdout).map_err(|e| e.to_string())?;
-    let path = stdout.trim_end();
-    if !std::path::Path::new(path).is_absolute() || path.contains('\n') {
-        return Err(format!("expected one store path, got {path:?}"));
-    }
-    Ok(path.to_owned())
-}
 fn run() -> Result<(), String> {
     let options = options()?;
     let mut command = options.command;
     let pinned = command.is_empty();
     if pinned {
-        let target = env::var_os("DRVLANG_BENCH").ok_or("supply a benchmark command after --")?;
-        let output = store_path(
-            Command::new("nix")
-                .args(["build", "--no-link", "--print-out-paths"])
-                .arg(target),
-        )?;
-        // Dynamic inputs change the concrete derivation Nix realizes. Check
-        // that exact recipe so each measured invocation reruns the workload.
-        let recipe = store_path(Command::new("nix").args(["path-info", "--derivation", &output]))?;
-        command = ["nix", "build", "--no-link", "--rebuild"]
+        let entry =
+            env::var_os("DRVLANG_BENCH_ENTRY").ok_or("supply a benchmark command after --")?;
+        command = ["nix", "build", "--no-link", "--impure", "--file"]
             .map(OsString::from)
             .to_vec();
-        command.push(format!("{recipe}^out").into());
-    } else {
-        measure(&command)?;
+        command.extend([entry, "--argstr".into(), "trial".into()]);
     }
+    let session = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let measure_trial = |trial: usize| {
+        if pinned {
+            let mut args = command.clone();
+            args.push(format!("{session}-{}-{trial}", std::process::id()).into());
+            measure(&args)
+        } else {
+            measure(&command)
+        }
+    };
+    measure_trial(0)?;
     let mut samples = Vec::with_capacity(options.runs);
     for trial in 1..=options.runs {
-        let elapsed = measure(&command)?;
+        let elapsed = measure_trial(trial)?;
         println!("run\t{trial}\t{elapsed} us");
         samples.push(elapsed);
     }

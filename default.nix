@@ -6,7 +6,8 @@ let
   eachSystem = lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
   clean = src:
     let root = toString src;
-    in if lib.isDerivation src then src else lib.cleanSourceWith {
+    in if src ? _isLibCleanSourceWith then src.outPath
+    else if lib.isDerivation src then src else lib.cleanSourceWith {
       name = "project-source";
       src = if builtins.isAttrs src then src.outPath else src;
       filter = path: type:

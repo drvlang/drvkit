@@ -28,8 +28,10 @@ let
     in if builtins.isAttrs commands then builtins.mapAttrs (_: relative) commands
        else throw "commands must map target names to project-relative paths";
   select = args:
-    let base = removeAttrs args [ "system" "target" "commands" ];
-        src = clean args.src;
+    let base = removeAttrs args [ "system" "target" "commands" "srcForTarget" ];
+        src = if target != null && target != "" && args ? srcForTarget then
+          args.srcForTarget { name = target; target = path; }
+          else clean args.src;
         target = args.target or null;
         commands = commandsFor args;
         path = if builtins.hasAttr target commands then commands.${target} else relative target;
@@ -106,6 +108,7 @@ in {
     in { default = app; ${name} = app; });
   checks = eachSystem (system: { cli = cli system; } // extraChecks system);
   lib = {
+    projectSource = import ./project-source.nix lib;
     mkPackage = package;
     mkTest = test;
     mkApp = app;

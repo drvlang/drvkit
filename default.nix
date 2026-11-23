@@ -1,9 +1,10 @@
 { self, nixpkgs, name, mkPackage, mkTest ? _: _: throw "This builder has no test runner"
 , mkApp ? null, selectTarget ? { src, target, ... }: { src = src + ("/" + target); }
-, extraChecks ? _: {} }:
+, extraChecks ? _: {}, systems ? [ "x86_64-linux" "aarch64-linux" ]
+, projectArgs ? args: args }:
 let
   inherit (nixpkgs) lib;
-  eachSystem = lib.genAttrs [ "x86_64-linux" "aarch64-linux" ];
+  eachSystem = lib.genAttrs systems;
   clean = src:
     let root = toString src;
     in if src ? _isLibCleanSourceWith then src.outPath
@@ -28,8 +29,9 @@ let
           (builtins.fromJSON (builtins.readFile manifest)).commands else {});
     in if builtins.isAttrs commands then builtins.mapAttrs (_: relative) commands
        else throw "commands must map target names to project-relative paths";
-  select = args:
-    let base = removeAttrs args [ "system" "target" "commands" "srcForTarget" ];
+  select = original:
+    let args = projectArgs original;
+        base = removeAttrs args [ "system" "target" "commands" "srcForTarget" ];
         src = if target != null && target != "" && args ? srcForTarget then
           args.srcForTarget { name = target; target = path; }
           else clean args.src;

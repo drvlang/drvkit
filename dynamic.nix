@@ -13,7 +13,9 @@ let
     install -m 0555 drvkit-symlink "$out"
   '';
   planner = builtins.derivation {
-    name = "${name}-result.drv";
+    # Keep the planner output distinct from the recipe nix-instantiate
+    # registers inside the sandbox, even when Nix rebuilds a known output.
+    name = "${name}-plan.drv";
     inherit system;
     builder = pkgs.runtimeShell;
     args = [ "-eu" "-c" ''
@@ -45,6 +47,11 @@ let
         name = ${builtins.toJSON "${name}-result"};
         system = ${builtins.toJSON system};
         builder = link;
+        # A floating output lets Nix realize this same recipe under the
+        # planner's basename without embedding a name-dependent output path.
+        __contentAddressed = true;
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
         args = [ (import ./result.nix) ];
         preferLocalBuild = true;
         allowSubstitutes = false;

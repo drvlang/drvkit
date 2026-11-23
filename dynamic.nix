@@ -4,7 +4,11 @@
 { name, expression, prepare ? "", copyDerivation ? null }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
-  forward = target: [ "-eu" "-c" ''${pkgs.coreutils}/bin/ln -s "$1" "$out"'' "forward" target ];
+  # Keep stdout/stderr open until the process exits. Some Nix daemons clean
+  # up a builder when its log pipes close, before coreutils ln has exited.
+  link = pkgs.runCommand "drvkit-symlink" {
+    nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc ];
+  } ''rustc --edition=2021 -C opt-level=s ${./src/symlink.rs} -o "$out"'';
   planner = builtins.derivation {
     name = "${name}-result.drv";
     inherit system;
@@ -17,6 +21,7 @@ let
       drv=$(${pkgs.nix}/bin/nix-instantiate ./forward.nix)
       ${if copyDerivation == null then ''cp "$drv" "$out"''
         else ''${copyDerivation} internal-copy-derivation "$drv" "$out"''}
+      exit 0
     '' ];
     PATH = pkgs.lib.makeBinPath [ pkgs.coreutils ];
     NIX_CONFIG = ''
@@ -32,12 +37,12 @@ let
     passAsFile = [ "expression" "wrapper" ];
     inherit expression;
     wrapper = ''
-      let coreutils = builtins.storePath "${pkgs.coreutils}";
+      let link = builtins.storePath "${link}";
       in builtins.derivation {
         name = ${builtins.toJSON "${name}-result"};
         system = ${builtins.toJSON system};
-        builder = "''${coreutils}/bin/ln";
-        args = [ "-s" (import ./result.nix) (builtins.placeholder "out") ];
+        builder = link;
+        args = [ (import ./result.nix) ];
         preferLocalBuild = true;
         allowSubstitutes = false;
       }
@@ -45,8 +50,8 @@ let
   };
   result = builtins.derivation {
     inherit name system;
-    builder = pkgs.runtimeShell;
-    args = forward (builtins.outputOf planner.outPath "out");
+    builder = link;
+    args = [ (builtins.outputOf planner.outPath "out") ];
     preferLocalBuild = true;
     allowSubstitutes = false;
   };

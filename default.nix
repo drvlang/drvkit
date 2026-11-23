@@ -17,6 +17,17 @@ let
   build = { system, src, ... }@args:
     mkPackage nixpkgs.legacyPackages.${system}
       ((removeAttrs args [ "system" ]) // { src = clean src; });
+  bench = system:
+    let pkgs = nixpkgs.legacyPackages.${system};
+    in pkgs.runCommand "drvbench" {
+      nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc pkgs.makeWrapper ];
+      meta.mainProgram = "drvbench";
+    } ''
+      mkdir -p "$out/bin"
+      rustc --edition=2021 -C opt-level=s ${./src/bench.rs} -o "$out/bin/drvbench"
+      wrapProgram "$out/bin/drvbench" --set DRVLANG_BENCH "path:${self.outPath}#checks.${system}.benchmark" \
+        --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
+    '';
   cli = system:
     let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -37,7 +48,7 @@ let
         --prefix PATH : ${lib.makeBinPath [ pkgs.nix ]}
     '';
 in {
-  packages = eachSystem (system: { ${name} = cli system; default = cli system; });
+  packages = eachSystem (system: { ${name} = cli system; default = cli system; bench = bench system; });
   checks = eachSystem (system: { cli = cli system; } // extraChecks system);
   lib.mkPackage = build;
   lib.mkFlake = args: let packages = eachSystem (system: { default = build (args // { inherit system; }); });

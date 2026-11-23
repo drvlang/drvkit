@@ -14,7 +14,18 @@ drvpy run -C . api -- --help
 
 ## Flakes
 
-Single projects use `lib.mkFlake { src = ./.; }`. Monorepos use `lib.mkMonorepoFlake { src = ./.; }` with a root `drvlang.json` like this.
+Pass an explicit file set to `lib.mkFlake`. For a uv project laid out under `src/` with tests under `tests/`, its downstream flake can use the following expression.
+
+```nix
+drvpy.lib.mkFlake {
+  src = drvpy.lib.projectSource {
+    root = ./.;
+    files = [ ./pyproject.toml ./uv.lock ./src ./tests ];
+  };
+}
+```
+
+Include any files your build backend reads, such as a README referenced in project metadata. A monorepo uses `lib.mkMonorepoFlake`. Use `srcForTarget = { name, target }: ...` to select each program's required files and shared packages. You can pass a `commands` map directly or include a root `drvlang.json` in the filtered source.
 
 ```json
 { "commands": { "api": "apps/api", "worker": "apps/worker" } }

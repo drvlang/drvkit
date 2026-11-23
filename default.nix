@@ -111,7 +111,7 @@ in {
     mkApp = app;
     mkFlake = args: flakeFor { default = args; };
     mkMonorepoFlake = args: let targets = commandsFor args;
-      in if targets == {} then throw "Set commands or add a drvlang.json containing a commands map"
-      else flakeFor (builtins.mapAttrs (name: _: args // { target = name; }) targets);
+      in flakeFor (if targets == {} then throw "Set commands or add a drvlang.json containing a commands map"
+        else builtins.mapAttrs (name: _: args // { target = name; }) targets);
   };
 }

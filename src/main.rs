@@ -6,7 +6,8 @@ use std::process::{Command, ExitCode};
 
 fn run() -> Result<ExitCode, String> {
     let tool = env::var("DRVLANG_TOOL").unwrap_or_else(|_| "drv".into());
-    let usage = format!("Usage: {tool} build [-C PROJECT] [-o RESULT | --no-link]");
+    let usage =
+        format!("Usage: {tool} build [-C PROJECT] [-o RESULT | --no-link] [--options JSON]");
     let mut args = env::args_os().skip(1);
     match args.next().as_deref().and_then(|s| s.to_str()) {
         None | Some("-h" | "--help") => {
@@ -19,6 +20,7 @@ fn run() -> Result<ExitCode, String> {
     let mut project = PathBuf::from(".");
     let mut link: Option<OsString> = None;
     let mut no_link = false;
+    let mut options = OsString::from("{}");
     while let Some(arg) = args.next() {
         match arg.to_str() {
             Some("-C" | "--directory") => {
@@ -26,6 +28,7 @@ fn run() -> Result<ExitCode, String> {
             }
             Some("-o" | "--out-link") => link = Some(args.next().ok_or("missing result path")?),
             Some("--no-link") => no_link = true,
+            Some("--options") => options = args.next().ok_or("missing JSON options")?,
             Some("-h" | "--help") => {
                 println!("{usage}");
                 return Ok(ExitCode::SUCCESS);
@@ -48,7 +51,9 @@ fn run() -> Result<ExitCode, String> {
         .args(["build", "--impure", "--print-out-paths", "--file"])
         .arg(entry)
         .args(["--argstr", "directory"])
-        .arg(project);
+        .arg(project)
+        .args(["--argstr", "options"])
+        .arg(options);
     if no_link {
         command.arg("--no-link");
     }

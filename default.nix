@@ -21,9 +21,11 @@ let
     let
       pkgs = nixpkgs.legacyPackages.${system};
       entry = pkgs.writeText "${name}-build.nix" ''
-        { directory }:
+        { directory, options ? "{}" }:
         let tool = builtins.getFlake "path:${self.outPath}";
-        in tool.lib.mkPackage { system = builtins.currentSystem; src = /. + directory; }
+        in tool.lib.mkPackage ((builtins.fromJSON options) // {
+          system = builtins.currentSystem; src = /. + directory;
+        })
       '';
     in pkgs.runCommand name {
       nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc pkgs.makeWrapper ];

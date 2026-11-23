@@ -12,9 +12,11 @@ drvpy run -C . api -- --help
 
 `build`, `test`, and `run` accept an optional target, `-C PROJECT`, and language options as `--options JSON`. Builds link `result` by default. Tests print the realized check path. Programs receive their arguments and return their own exit status.
 
-The public package and test outputs use floating content addressing. Nix computes their store paths when it realizes them. Use `nix build --no-link --print-out-paths` to obtain a realized path. Publish the named target, its build traces, and the closures of intermediate outputs. The [monorepo CI guide](https://drvlang.org/monorepos/) shows the commands for Nix 2.35.
+The public package and test outputs use floating content addressing. Nix computes their store paths when it realizes them. Use `nix build --no-link --print-out-paths` to obtain a realized path.
 
-`bash tests/cache.sh` verifies that a fresh runner can restore the planner and its generated work from a signed file cache with zero build slots. It uses the standard Nixpkgs binary cache for tools.
+For Nix 2.35, run `bash publish-cache.sh [--upstream READABLE-CACHE] WRITABLE-CACHE TARGET...` after a successful build. Supply the same named installables you built. This copies their build traces, intermediate outputs and build inputs. Use `--upstream https://cache.nixos.org` when consumers can also read that cache. The publisher checks which direct build inputs it already serves, then copies the remaining inputs and their closures. The initial upload can include source trees and build tools. [Monorepo CI example](https://drvlang.org/monorepos/)
+
+`bash tests/cache.sh` restores a dynamic build that uses a project-specific build-time input in a fresh store. It checks the payload with a signed file cache, the standard Nixpkgs cache, and zero build slots.
 
 ## Flakes
 

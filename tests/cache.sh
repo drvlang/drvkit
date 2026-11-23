@@ -14,9 +14,8 @@ nix key generate-secret --key-name drvkit-test > "$scratch/key"
 public=$(nix key convert-secret-to-public < "$scratch/key")
 recipe=$(nix-instantiate "$(dirname "$0")/cache.nix" --option allow-import-from-derivation false)
 expected=$(nix build --no-link --print-out-paths "$recipe^out")
-nix store build-trace info --recursive --json "$recipe^out" |
-  jq -r '.[] | select(.value) | "/nix/store/" + .value.outPath' |
-  nix copy --to "$cache?secret-key=$scratch/key" --stdin "$recipe^out"
+bash "$(dirname "$0")/../publish-cache.sh" --upstream https://cache.nixos.org \
+  "$cache?secret-key=$scratch/key" "$recipe^out"
 
 # Seed only the expression and its input recipes. A new runner must obtain
 # every output from the signed project cache or the usual Nixpkgs cache.

@@ -10,11 +10,20 @@ use std::{
     time::Instant,
 };
 
-/// Construct an argument vector without passing data through a shell.
+/// Convert mixed path and text arguments into a fixed-size command line.
 #[macro_export]
-macro_rules! argv { ($($arg:expr),* $(,)?) => {
-    vec![$(std::ffi::OsStr::new(&$arg).to_string_lossy().into_owned()),*]
-}; }
+macro_rules! args_array {
+    ($($arg:expr),* $(,)?) => {
+        [$(std::ffi::OsStr::new(&$arg).to_string_lossy().into_owned()),*]
+    };
+}
+/// Create a command line that can grow as flags are selected.
+#[macro_export]
+macro_rules! argv {
+    ($($arg:expr),* $(,)?) => {
+        Vec::from($crate::args_array![$($arg),*])
+    };
+}
 pub fn command(args: &[String]) -> Command {
     let mut c = Command::new(&args[0]);
     c.args(&args[1..]);
@@ -135,7 +144,7 @@ pub fn safe_label(s: &str) -> bool {
 pub fn copy_tree(from: &Path, to: &Path, dereference: bool) -> Result<()> {
     fs::create_dir_all(to)?;
     let flag = if dereference { "-RLp" } else { "-RPp" };
-    run(&argv!["cp", flag, "--", from.join("."), to])?;
+    run(&args_array!["cp", flag, "--", from.join("."), to])?;
     Ok(())
 }
 pub fn quiet(c: &mut Command) -> Result<()> {

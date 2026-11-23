@@ -5,6 +5,7 @@
 let
   inherit (nixpkgs) lib;
   eachSystem = lib.genAttrs systems;
+  ca = drv: drv.overrideAttrs { __contentAddressed = true; };
   clean = src:
     let root = toString src;
     in if src ? _isLibCleanSourceWith then src.outPath
@@ -48,7 +49,7 @@ let
         selected = select args;
         pkg = mkPackage pkgs (packageArgs selected);
         basename = selected.program or null;
-        discover = pkgs.writeShellScript "${name}-run" ''
+        discover = ca (pkgs.writeShellScript "${name}-run" ''
           shopt -s nullglob
           programs=()
           for candidate in "${pkg}"/bin/*; do
@@ -59,7 +60,7 @@ let
             exit 1
           fi
           exec "''${programs[0]}" "$@"
-        '';
+        '');
     in if mkApp != null then mkApp pkgs selected pkg else {
       type = "app"; program = if basename == null then toString discover
         else if builtins.match "[^/]+" basename == null || builtins.elem basename [ "." ".." ]
@@ -71,6 +72,7 @@ let
   bench = system:
     let pkgs = nixpkgs.legacyPackages.${system};
     in pkgs.runCommand "drvbench" {
+      __contentAddressed = true;
       nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc pkgs.makeWrapper ];
       meta.mainProgram = "drvbench";
     } ''
@@ -82,7 +84,7 @@ let
   cli = system:
     let
       pkgs = nixpkgs.legacyPackages.${system};
-      entry = pkgs.writeText "${name}-cli.nix" ''
+      entry = ca (pkgs.writeText "${name}-cli.nix" ''
         { directory, operation, target ? "", options ? "{}", testArgCount ? "0" }:
         let tool = builtins.getFlake "path:${self.outPath}";
             args = builtins.fromJSON options // {
@@ -94,9 +96,10 @@ let
            else if operation == "test" then tool.lib.mkTest args
            else let app = tool.lib.mkApp args;
                     pkgs = tool.inputs.nixpkgs.legacyPackages.''${args.system};
-                in pkgs.writeShellScript "${name}-run" ("exec " + pkgs.lib.escapeShellArg app.program + " \"$@\"")
-      '';
+                in (pkgs.writeShellScript "${name}-run" ("exec " + pkgs.lib.escapeShellArg app.program + " \"$@\"")).overrideAttrs { __contentAddressed = true; }
+      '');
     in pkgs.runCommand name {
+      __contentAddressed = true;
       nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc pkgs.makeWrapper ];
       meta.mainProgram = name;
     } ''

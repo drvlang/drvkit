@@ -12,6 +12,8 @@ drvpy run -C . api -- --help
 
 `build`, `test`, and `run` accept an optional target, `-C PROJECT`, and language options as `--options JSON`. Builds link `result` by default. Tests print the realized check path. Programs receive their arguments and return their own exit status.
 
+The public package and test outputs use floating content addressing. Nix computes their store paths when it realizes them. Use `nix build --no-link --print-out-paths` to obtain a realized path. Publish CA build traces with a derivation-aware copy, for example `nix copy --to "$cache" .#api`.
+
 ## Flakes
 
 Pass an explicit file set to `lib.mkFlake`. For a uv project laid out under `src/` with tests under `tests/`, its downstream flake can use the following expression.

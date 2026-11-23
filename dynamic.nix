@@ -7,6 +7,7 @@ let
   # Keep stdout/stderr open until the process exits. Some Nix daemons clean
   # up a builder when its log pipes close, before coreutils ln has exited.
   link = pkgs.runCommand "drvkit-symlink" {
+    __contentAddressed = true;
     nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc ];
   } ''
     rustc --edition=2021 -C opt-level=s ${./src/symlink.rs} -o drvkit-symlink
@@ -54,15 +55,16 @@ let
         outputHashAlgo = "sha256";
         args = [ (import ./result.nix) ];
         preferLocalBuild = true;
-        allowSubstitutes = false;
       }
     '';
   };
   result = builtins.derivation {
     inherit name system;
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
     builder = link;
     args = [ (builtins.outputOf planner.outPath "out") ];
     preferLocalBuild = true;
-    allowSubstitutes = false;
   };
 in result // { inherit planner; passthru = { inherit planner; }; }

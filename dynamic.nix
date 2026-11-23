@@ -1,7 +1,7 @@
 # Instantiate the lock-derived graph inside a recursive builder. The evaluator
 # that imports the consumer's flake only sees the planner and its dynamic edge.
 { pkgs }:
-{ name, expression, prepare ? "" }:
+{ name, expression, prepare ? "", copyDerivation ? null }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
   forward = target: [ "-eu" "-c" ''${pkgs.coreutils}/bin/ln -s "$1" "$out"'' "forward" target ];
@@ -15,7 +15,8 @@ let
       cp "$expressionPath" ./result.nix
       cp "$wrapperPath" ./forward.nix
       drv=$(${pkgs.nix}/bin/nix-instantiate ./forward.nix)
-      cp "$drv" "$out"
+      ${if copyDerivation == null then ''cp "$drv" "$out"''
+        else ''${copyDerivation} internal-copy-derivation "$drv" "$out"''}
     '' ];
     PATH = pkgs.lib.makeBinPath [ pkgs.coreutils ];
     NIX_CONFIG = ''

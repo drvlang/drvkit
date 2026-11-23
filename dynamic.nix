@@ -4,15 +4,7 @@
 { name, expression, prepare ? "", copyDerivation ? null }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
-  # Keep stdout/stderr open until the process exits. Some Nix daemons clean
-  # up a builder when its log pipes close, before coreutils ln has exited.
-  link = pkgs.runCommand "drvkit-symlink" {
-    __contentAddressed = true;
-    nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc ];
-  } ''
-    rustc --edition=2021 -C opt-level=s ${./src/symlink.rs} -o drvkit-symlink
-    install -m 0555 drvkit-symlink "$out"
-  '';
+  forward = import ./forward.nix { inherit system; inherit (pkgs) bash coreutils; };
   planner = builtins.derivation {
     # Keep the planner output distinct from the recipe nix-instantiate
     # registers inside the sandbox, even when Nix rebuilds a known output.
@@ -39,32 +31,21 @@ let
     outputHashAlgo = "sha256";
     requiredSystemFeatures = [ "recursive-nix" ];
     preferLocalBuild = true;
-    allowSubstitutes = false;
     passAsFile = [ "expression" "wrapper" ];
     inherit expression;
     wrapper = ''
-      let link = builtins.storePath "${link}";
-      in builtins.derivation {
-        name = ${builtins.toJSON "${name}-result"};
+      (import ${./forward.nix} {
         system = ${builtins.toJSON system};
-        builder = link;
-        # A floating output lets Nix realize this same recipe under the
-        # planner's basename without embedding a name-dependent output path.
-        __contentAddressed = true;
-        outputHashMode = "recursive";
-        outputHashAlgo = "sha256";
-        args = [ (import ./result.nix) ];
-        preferLocalBuild = true;
+        bash = builtins.storePath "${pkgs.bash}";
+        coreutils = builtins.storePath "${pkgs.coreutils}";
+      }) {
+        name = ${builtins.toJSON "${name}-result"};
+        target = import ./result.nix;
       }
     '';
   };
-  result = builtins.derivation {
-    inherit name system;
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    builder = link;
-    args = [ (builtins.outputOf planner.outPath "out") ];
-    preferLocalBuild = true;
+  result = forward {
+    inherit name;
+    target = builtins.outputOf planner.outPath "out";
   };
 in result // { inherit planner; passthru = { inherit planner; }; }

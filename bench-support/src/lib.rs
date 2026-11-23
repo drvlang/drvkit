@@ -123,10 +123,8 @@ pub fn fresh_dir(p: &Path) -> Result<()> {
     fs::create_dir(p).with_context(|| format!("creating fresh {}", p.display()))
 }
 pub fn nonce() -> Result<String> {
-    Ok(fs::read_to_string("/proc/sys/kernel/random/uuid")?
-        .trim()
-        .replace('-', "")[..12]
-        .into())
+    let scratch = tempfile::Builder::new().rand_bytes(16).tempdir()?;
+    Ok(sha256(scratch.path().as_os_str().as_encoded_bytes())[..12].into())
 }
 pub fn log_file(out: &Path, name: &str) -> Result<fs::File> {
     Ok(fs::File::create(out.join(name))?)

@@ -14,6 +14,8 @@ drvpy run -C . api -- --help
 
 The public package and test outputs use floating content addressing. Nix computes their store paths when it realizes them. Use `nix build --no-link --print-out-paths` to obtain a realized path. Publish the named target, its build traces, and the closures of intermediate outputs. The [monorepo CI guide](https://drvlang.org/monorepos/) shows the commands for Nix 2.35.
 
+`bash tests/cache.sh` verifies that a fresh runner can restore the planner and its generated work from a signed file cache with zero build slots. It uses the standard Nixpkgs binary cache for tools.
+
 ## Flakes
 
 Pass an explicit file set to `lib.mkFlake`. For a uv project laid out under `src/` with tests under `tests/`, its downstream flake can use the following expression.

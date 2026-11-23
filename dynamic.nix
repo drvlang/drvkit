@@ -8,7 +8,10 @@ let
   # up a builder when its log pipes close, before coreutils ln has exited.
   link = pkgs.runCommand "drvkit-symlink" {
     nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc ];
-  } ''rustc --edition=2021 -C opt-level=s ${./src/symlink.rs} -o "$out"'';
+  } ''
+    rustc --edition=2021 -C opt-level=s ${./src/symlink.rs} -o drvkit-symlink
+    install -m 0555 drvkit-symlink "$out"
+  '';
   planner = builtins.derivation {
     name = "${name}-result.drv";
     inherit system;

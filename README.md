@@ -12,7 +12,7 @@ drvpy run -C . api -- --help
 
 `build`, `test`, and `run` accept an optional target, `-C PROJECT`, and language options as `--options JSON`. Builds link `result` by default. Tests print the realized check path. Programs receive their arguments and return their own exit status.
 
-The public package and test outputs use floating content addressing. Nix computes their store paths when it realizes them. Use `nix build --no-link --print-out-paths` to obtain a realized path. Publish CA build traces with a derivation-aware copy, for example `nix copy --to "$cache" .#api`.
+The public package and test outputs use floating content addressing. Nix computes their store paths when it realizes them. Use `nix build --no-link --print-out-paths` to obtain a realized path. Publish the named target, its build traces, and the closures of intermediate outputs. The [monorepo CI guide](https://drvlang.org/monorepos/) shows the commands for Nix 2.35.
 
 ## Flakes
 

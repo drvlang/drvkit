@@ -4,6 +4,11 @@ let
   root = /. + builtins.getEnv "DRVKIT_TEST_ROOT";
   tools = import ../. {
     name = "source-test"; self = {}; inherit nixpkgs;
+    toolSource = {
+      root = root + "/tool";
+      files = [ (root + "/tool/builder.nix") ];
+      benchmarkFiles = [ (root + "/tool/benchmark.nix") ];
+    };
     mkPackage = _: args: args.src;
     mkTest = _: args: args.src;
     selectTarget = { src, ... }: { inherit src; };
@@ -28,6 +33,8 @@ assert !builtins.pathExists (member + "/private");
 assert links.readFile "member/local-link" == view.readFile "member/file";
 assert (links.readDir "member")."hidden-link" == "symlink" && !(links.exists "member/hidden-link/file");
 {
+  cli = tools.packages.${builtins.currentSystem}.default.drvPath;
+  bench = tools.packages.${builtins.currentSystem}.bench.drvPath;
   package = toString (tools.lib.mkPackage args);
   check = toString (tools.lib.mkTest callback);
 }

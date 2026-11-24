@@ -8,7 +8,7 @@ let
   ca = drv: drv.overrideAttrs { __contentAddressed = true; allowSubstitutes = true; };
   clean = src:
     let root = toString src;
-    in if src ? _isLibCleanSourceWith then src.outPath
+    in if src ? _isLibCleanSourceWith then src
     else if lib.isDerivation src then src else lib.cleanSourceWith {
       name = "project-source";
       src = if builtins.isAttrs src then src.outPath else src;

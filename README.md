@@ -2,6 +2,8 @@
 
 drvkit supplies the Rust command line, dynamic Nix planner, and flake outputs used by the [drvlang builders](https://drvlang.org/languages/). A language repository pins this repository as a source input and provides its package and test builders.
 
+Language builders declare `toolSource = { root = ./.; files = [ ... ]; benchmarkFiles = [ ... ]; };` when importing drvkit. List the local files the installed CLI needs to evaluate build, test, and run. The benchmark command adds `benchmarkFiles`. drvkit includes the flake and its lock in both file sets.
+
 ## CLI
 
 ```sh

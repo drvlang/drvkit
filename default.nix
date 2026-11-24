@@ -1,40 +1,47 @@
 { self, nixpkgs, name, mkPackage, mkTest ? _: _: throw "This builder has no test runner"
 , mkApp ? null, selectTarget ? { src, target, ... }: { src = src + ("/" + target); }
 , extraChecks ? _: {}, systems ? [ "x86_64-linux" "aarch64-linux" ]
-, projectArgs ? args: args }:
+, toolSource ? null, projectArgs ? args: args }:
 let
   inherit (nixpkgs) lib;
   eachSystem = lib.genAttrs systems;
   ca = drv: drv.overrideAttrs { __contentAddressed = true; allowSubstitutes = true; };
-  clean = src:
-    let root = toString src;
-    in if src ? _isLibCleanSourceWith then src
-    else if lib.isDerivation src then src else lib.cleanSourceWith {
-      name = "project-source";
-      src = if builtins.isAttrs src then src.outPath else src;
-      filter = path: type:
-        let rel = lib.removePrefix (root + "/") (toString path);
-            base = baseNameOf path;
-        in lib.cleanSourceFilter path type &&
-          !(type == "directory" && builtins.elem base [ ".venv" ".devenv" ".direnv" ".drvlang" ".gradle" ]) &&
-          !(builtins.elem rel [ "target" "result" ]) &&
-          !(type == "symlink" && lib.hasPrefix "result-" rel);
+  # Flake entry points are evaluated again by the installed commands.
+  entrySource = benchmark: if toolSource == null then self.outPath else
+    let inherit (toolSource) root;
+    in lib.fileset.toSource {
+      inherit root;
+      fileset = lib.fileset.unions ([ (root + "/flake.nix") (root + "/flake.lock") ]
+        ++ toolSource.files ++ lib.optionals benchmark toolSource.benchmarkFiles);
     };
+  projectFilter = import ./project-filter.nix lib;
+  clean = src:
+    if src ? _isLibCleanSourceWith || lib.isDerivation src then src
+    else let root = if builtins.isAttrs src then src.outPath else src;
+         in lib.cleanSourceWith {
+           name = "project-source"; src = root;
+           filter = path: type: lib.cleanSourceFilter path type
+             && projectFilter root path type
+             && !(dirOf path == toString root && builtins.elem (baseNameOf path) [ "result" "target" ]);
+         };
   relative = path: let p = lib.removePrefix "./" path;
     in if path == "." then "." else if p == "" || lib.hasPrefix "/" p ||
       lib.any (part: builtins.elem part [ "" "." ".." ]) (lib.splitString "/" p)
     then throw "Expected a project-relative member path, got ${builtins.toJSON path}" else p;
   commandsFor = args:
-    let manifest = args.src + "/drvlang.json";
-        commands = args.commands or (if builtins.pathExists manifest then
-          (builtins.fromJSON (builtins.readFile manifest)).commands else {});
+    let source = import ./source-reader.nix lib args.src;
+        commands = args.commands or (if source.exists "drvlang.json" then
+          (builtins.fromJSON (source.readFile "drvlang.json")).commands else {});
     in if builtins.isAttrs commands then builtins.mapAttrs (_: relative) commands
        else throw "commands must map target names to project-relative paths";
   select = original:
     let args = projectArgs original;
         base = removeAttrs args [ "system" "target" "commands" "srcForTarget" ];
         src = if target != null && target != "" && args ? srcForTarget then
-          args.srcForTarget { name = target; target = path; }
+          let selected = args.srcForTarget { name = target; target = path; };
+          in if builtins.isPath selected then lib.cleanSourceWith {
+            name = "project-source"; src = selected; filter = projectFilter selected;
+          } else selected
           else clean args.src;
         target = args.target or null;
         commands = commandsFor args;
@@ -74,7 +81,7 @@ let
         # Each trial runs the benchmark itself, even if its CA output is
         # already in the store. Its dependency graph stays warm.
         entry = ca (pkgs.writeText "drvbench.nix" ''
-          { trial }: ((builtins.getFlake "path:${self.outPath}").checks.${system}.benchmark).overrideAttrs {
+          { trial }: ((builtins.getFlake "path:${entrySource true}").checks.${system}.benchmark).overrideAttrs {
             drvlangBenchTrial = trial;
             allowSubstitutes = false;
           }
@@ -94,7 +101,7 @@ let
       pkgs = nixpkgs.legacyPackages.${system};
       entry = ca (pkgs.writeText "${name}-cli.nix" ''
         { directory, operation, target ? "", options ? "{}", testArgCount ? "0" }:
-        let tool = builtins.getFlake "path:${self.outPath}";
+        let tool = builtins.getFlake "path:${entrySource false}";
             args = builtins.fromJSON options // {
               inherit target;
               system = builtins.currentSystem; src = /. + directory;

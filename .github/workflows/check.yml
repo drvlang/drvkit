@@ -17,4 +17,5 @@ jobs:
             extra-system-features = recursive-nix ca-derivations
             allow-import-from-derivation = false
       - run: nix eval --impure --file tests/nixpkgs-source.nix
+      - run: bash tests/project-source.sh
       - run: bash tests/cache.sh
